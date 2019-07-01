@@ -147,13 +147,19 @@ func (reg *registry) add(topic string, ch chan interface{}) {
 }
 
 func (reg *registry) send(topic string, msg interface{}) {
-	for ch := range reg.topics[topic] {
+	for ch, ok := range reg.topics[topic] {
+		if !ok {
+			break
+		}
 		ch <- msg
 	}
 }
 
 func (reg *registry) sendNoWait(topic string, msg interface{}) {
-	for ch := range reg.topics[topic] {
+	for ch, ok := range reg.topics[topic] {
+		if !ok {
+			break
+		}
 		select {
 		case ch <- msg:
 		default:
