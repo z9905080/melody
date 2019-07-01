@@ -77,7 +77,7 @@ func (s *Session) close() {
 		s.open = false
 		s.conn.Close()
 		close(s.output)
-		close(s.subChan)
+		s.melody.pubsub.Unsub(s.subChan)
 		s.rwmutex.Unlock()
 	}
 }
