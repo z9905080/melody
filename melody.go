@@ -100,6 +100,11 @@ func New() *Melody {
 	}
 }
 
+// PubMsg Publish Msg To Session Subscribe
+func (m *Melody) PubMsg(msg interface{}, topics ...string) {
+	m.pubsub.Pub(msg, topics...)
+}
+
 // HandleConnect fires fn when a session connects.
 func (m *Melody) HandleConnect(fn func(*Session)) {
 	m.connectHandler = fn
