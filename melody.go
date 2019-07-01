@@ -2,7 +2,6 @@ package melody
 
 import (
 	"errors"
-	"melody/pubsub"
 	"net/http"
 	"sync"
 
@@ -68,7 +67,7 @@ type Melody struct {
 	disconnectHandler        handleSessionFunc
 	pongHandler              handleSessionFunc
 	hub                      *hub
-	pubsub                   *pubsub.PubSub
+	pubsub                   *PubSub
 }
 
 // New creates a new melody instance with default Upgrader and Config.
@@ -96,7 +95,7 @@ func New() *Melody {
 		disconnectHandler:        func(*Session) {},
 		pongHandler:              func(*Session) {},
 		hub:                      hub,
-		pubsub:                   pubsub.New(100),
+		pubsub:                   PubSubNew(100),
 	}
 }
 

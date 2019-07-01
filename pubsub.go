@@ -1,4 +1,4 @@
-package pubsub
+package melody
 
 type operation int
 
@@ -12,7 +12,7 @@ const (
 	shutdown
 )
 
-// PubSub is a collection of topics.
+// PubSub 集合topic,capacity是容量
 type PubSub struct {
 	cmdChan  chan cmd
 	capacity int
@@ -25,9 +25,8 @@ type cmd struct {
 	msg    interface{}
 }
 
-// New creates a new PubSub and starts a goroutine for handling operations.
-// The capacity of the channels created by Sub and SubOnce will be as specified.
-func New(capacity int) *PubSub {
+// PubSubNew 創建一個訂閱者模式(pattern)
+func PubSubNew(capacity int) *PubSub {
 	ps := &PubSub{make(chan cmd), capacity}
 	go ps.start()
 	return ps
