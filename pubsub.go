@@ -3,95 +3,105 @@ package melody
 type operation int
 
 const (
-	sub operation = iota
-	pub
-	tryPub
-	unsub
-	unsubAll
-	closeTopic
-	shutdown
+	// Subscribe 訂閱
+	Subscribe operation = iota
+	// Publish 發布訊息
+	Publish
+	// AsyncPublish 非同步發布訊息
+	AsyncPublish
+	// Unsubscribe 取消訂閱
+	Unsubscribe
+	// UnSubscribeAll 全部取消訂閱
+	UnSubscribeAll
+	// CloseTopic 關閉此標題
+	CloseTopic
+	// ShutDown 此訂閱服務關機
+	ShutDown
 )
 
-// PubSub 集合topic,capacity是容量
-type PubSub struct {
-	cmdChan  chan cmd
-	capacity int
+// pubSubPattern 集合topic,capacity是容量
+type pubSub struct {
+	commandChan chan cmd // 接收指令的channel
+	bufferSize  int
 }
 
 type cmd struct {
-	op     operation
-	topics []string
-	ch     chan interface{}
-	msg    interface{}
+	opCode operation        // 指令
+	topics []string         // 訂閱的主題
+	ch     chan interface{} // 使用的channel
+	msg    interface{}      // 訊息內文
 }
 
-// PubSubNew 創建一個訂閱者模式(pattern)
-func PubSubNew(capacity int) *PubSub {
-	ps := &PubSub{make(chan cmd), capacity}
+// pubSubNew 創建一個訂閱者模式(pattern)
+func pubSubNew(bufferSize int) *pubSub {
+	ps := &pubSub{make(chan cmd), bufferSize}
 	go ps.start()
 	return ps
 }
 
 // Sub 創建一個新的訂閱頻道, 並將channel回傳
-func (ps *PubSub) Sub(topics ...string) chan interface{} {
-	return ps.sub(sub, topics...)
+func (ps *pubSub) Sub(topics ...string) chan interface{} {
+	return ps.sub(Subscribe, topics...)
 }
 
-func (ps *PubSub) sub(op operation, topics ...string) chan interface{} {
-	ch := make(chan interface{}, ps.capacity)
-	ps.cmdChan <- cmd{op: op, topics: topics, ch: ch}
+func (ps *pubSub) sub(op operation, topics ...string) chan interface{} {
+	ch := make(chan interface{}, ps.bufferSize)
+	ps.commandChan <- cmd{opCode: op, topics: topics, ch: ch}
 	return ch
 }
 
 // AddSub 將要訂閱的Topic加到現有的channel
-func (ps *PubSub) AddSub(ch chan interface{}, topics ...string) {
-	ps.cmdChan <- cmd{op: sub, topics: topics, ch: ch}
+func (ps *pubSub) AddSub(ch chan interface{}, topics ...string) {
+	ps.commandChan <- cmd{opCode: Subscribe, topics: topics, ch: ch}
 }
 
 // Pub 發布訊息
-func (ps *PubSub) Pub(msg interface{}, topics ...string) {
-	ps.cmdChan <- cmd{op: pub, topics: topics, msg: msg}
+func (ps *pubSub) Pub(msg interface{}, topics ...string) {
+	ps.commandChan <- cmd{opCode: Publish, topics: topics, msg: msg}
 }
 
-// TryPub 非同步的發布訊息
-func (ps *PubSub) TryPub(msg interface{}, topics ...string) {
-	ps.cmdChan <- cmd{op: tryPub, topics: topics, msg: msg}
+// AsyncPub 非同步的發布訊息，內部機制（for select default）
+func (ps *pubSub) AsyncPub(msg interface{}, topics ...string) {
+	ps.commandChan <- cmd{opCode: AsyncPublish, topics: topics, msg: msg}
 }
 
 // Unsub 取消訂閱
-func (ps *PubSub) Unsub(ch chan interface{}, topics ...string) {
+func (ps *pubSub) Unsub(ch chan interface{}, topics ...string) {
+	// 如果不寫topic，視為將全部topic都取消訂閱
 	if len(topics) == 0 {
-		ps.cmdChan <- cmd{op: unsubAll, ch: ch}
+		ps.commandChan <- cmd{opCode: UnSubscribeAll, ch: ch}
 		return
 	}
 
-	ps.cmdChan <- cmd{op: unsub, topics: topics, ch: ch}
+	ps.commandChan <- cmd{opCode: Unsubscribe, topics: topics, ch: ch}
 }
 
 // Close 關閉Topic, 相關有訂閱的channel都會被取消
-func (ps *PubSub) Close(topics ...string) {
-	ps.cmdChan <- cmd{op: closeTopic, topics: topics}
+func (ps *pubSub) Close(topics ...string) {
+	ps.commandChan <- cmd{opCode: CloseTopic, topics: topics}
 }
 
 // Shutdown 關閉所有有訂閱的Channel
-func (ps *PubSub) Shutdown() {
-	ps.cmdChan <- cmd{op: shutdown}
+func (ps *pubSub) Shutdown() {
+	ps.commandChan <- cmd{opCode: ShutDown}
 }
 
-func (ps *PubSub) start() {
-	reg := registry{
+func (ps *pubSub) start() {
+
+	// 初始化暫存在記憶體的資料(topicsMap & revertTopicsOfChannelMap)
+	reg := register{
 		topics:    make(map[string]map[chan interface{}]bool),
 		revTopics: make(map[chan interface{}]map[string]bool),
 	}
 
 loop:
-	for cmd := range ps.cmdChan {
+	for cmd := range ps.commandChan {
 		if cmd.topics == nil {
-			switch cmd.op {
-			case unsubAll:
+			switch cmd.opCode {
+			case UnSubscribeAll:
 				reg.removeChannel(cmd.ch)
 
-			case shutdown:
+			case ShutDown:
 				break loop
 			}
 
@@ -99,98 +109,29 @@ loop:
 		}
 
 		for _, topic := range cmd.topics {
-			switch cmd.op {
-			case sub:
+			switch cmd.opCode {
+			case Subscribe:
 				reg.add(topic, cmd.ch)
 
-			case tryPub:
-				reg.sendNoWait(topic, cmd.msg)
-
-			case pub:
+			case Publish:
 				reg.send(topic, cmd.msg)
 
-			case unsub:
+			case AsyncPublish:
+				reg.sendAsync(topic, cmd.msg)
+
+			case Unsubscribe:
 				reg.remove(topic, cmd.ch)
 
-			case closeTopic:
+			case CloseTopic:
 				reg.removeTopic(topic)
 			}
 		}
 	}
 
+	// 當跳出迴圈要結束時，將所有未關閉的topic channel進行移除
 	for topic, chans := range reg.topics {
 		for ch := range chans {
 			reg.remove(topic, ch)
 		}
-	}
-}
-
-// registry
-// topics    Key: topic  , Value: 有訂閱此Topic的ChannelMap
-// revTopics Key: Channel, Value: 訂閱了哪些Topic
-type registry struct {
-	topics    map[string]map[chan interface{}]bool
-	revTopics map[chan interface{}]map[string]bool
-}
-
-func (reg *registry) add(topic string, ch chan interface{}) {
-	if reg.topics[topic] == nil {
-		reg.topics[topic] = make(map[chan interface{}]bool)
-	}
-	reg.topics[topic][ch] = true
-
-	if reg.revTopics[ch] == nil {
-		reg.revTopics[ch] = make(map[string]bool)
-	}
-	reg.revTopics[ch][topic] = true
-}
-
-func (reg *registry) send(topic string, msg interface{}) {
-	for ch := range reg.topics[topic] {
-		ch <- msg
-	}
-}
-
-func (reg *registry) sendNoWait(topic string, msg interface{}) {
-	for ch := range reg.topics[topic] {
-		select {
-		case ch <- msg:
-		default:
-		}
-
-	}
-}
-
-func (reg *registry) removeTopic(topic string) {
-	for ch := range reg.topics[topic] {
-		reg.remove(topic, ch)
-	}
-}
-
-func (reg *registry) removeChannel(ch chan interface{}) {
-	for topic := range reg.revTopics[ch] {
-		reg.remove(topic, ch)
-	}
-}
-
-func (reg *registry) remove(topic string, ch chan interface{}) {
-	if _, ok := reg.topics[topic]; !ok {
-		return
-	}
-
-	if _, ok := reg.topics[topic][ch]; !ok {
-		return
-	}
-
-	delete(reg.topics[topic], ch)
-	delete(reg.revTopics[ch], topic)
-
-	if len(reg.topics[topic]) == 0 {
-		delete(reg.topics, topic)
-	}
-
-	if len(reg.revTopics[ch]) == 0 {
-		close(ch)
-		delete(reg.revTopics, ch)
 	}
 }

@@ -67,7 +67,7 @@ type Melody struct {
 	disconnectHandler        handleSessionFunc
 	pongHandler              handleSessionFunc
 	hub                      *hub
-	pubsub                   *PubSub
+	pubsub                   *pubSub
 }
 
 // New creates a new melody instance with default Upgrader and Config.
@@ -95,7 +95,7 @@ func New() *Melody {
 		disconnectHandler:        func(*Session) {},
 		pongHandler:              func(*Session) {},
 		hub:                      hub,
-		pubsub:                   PubSubNew(100),
+		pubsub:                   pubSubNew(100),
 	}
 }
 
