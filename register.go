@@ -4,13 +4,13 @@ package melody
 // topics    Key: topic  , Value: 有訂閱此Topic的ChannelMap
 // revTopics Key: Channel, Value: 訂閱了哪些Topic
 type register struct {
-	topics    map[string]map[chan interface{}]bool
-	revTopics map[chan interface{}]map[string]bool
+	topics    map[string]map[chan *envelope]bool
+	revTopics map[chan *envelope]map[string]bool
 }
 
-func (reg *register) add(topic string, ch chan interface{}) {
+func (reg *register) add(topic string, ch chan *envelope) {
 	if reg.topics[topic] == nil {
-		reg.topics[topic] = make(map[chan interface{}]bool)
+		reg.topics[topic] = make(map[chan *envelope]bool)
 	}
 	reg.topics[topic][ch] = true
 
@@ -20,13 +20,13 @@ func (reg *register) add(topic string, ch chan interface{}) {
 	reg.revTopics[ch][topic] = true
 }
 
-func (reg *register) send(topic string, msg interface{}) {
+func (reg *register) send(topic string, msg *envelope) {
 	for ch := range reg.topics[topic] {
 		ch <- msg
 	}
 }
 
-func (reg *register) sendAsync(topic string, msg interface{}) {
+func (reg *register) sendAsync(topic string, msg *envelope) {
 	for ch := range reg.topics[topic] {
 		select {
 		case ch <- msg:
@@ -42,13 +42,13 @@ func (reg *register) removeTopic(topic string) {
 	}
 }
 
-func (reg *register) removeChannel(ch chan interface{}) {
+func (reg *register) removeChannel(ch chan *envelope) {
 	for topic := range reg.revTopics[ch] {
 		reg.remove(topic, ch)
 	}
 }
 
-func (reg *register) remove(topic string, ch chan interface{}) {
+func (reg *register) remove(topic string, ch chan *envelope) {
 	if _, ok := reg.topics[topic]; !ok {
 		return
 	}

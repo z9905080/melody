@@ -19,7 +19,7 @@ type Session struct {
 	melody   *Melody
 	open     bool
 	rwmutex  *sync.RWMutex
-	subChan  chan interface{}
+	subChan  chan *envelope
 }
 
 // AddSub 訂閱某個,多個topic
@@ -93,10 +93,28 @@ func (s *Session) writePump() {
 loop:
 	for {
 		select {
-		case v := <-s.subChan:
-			if msg, isExist := v.([]byte); isExist {
-				s.Write(msg)
+		case msg, ok := <-s.subChan:
+			if !ok {
+				break loop
 			}
+			err := s.writeRaw(msg)
+			if err != nil {
+				s.melody.errorHandler(s, err)
+				break loop
+			}
+
+			if msg.t == websocket.CloseMessage {
+				break loop
+			}
+
+			if msg.t == websocket.TextMessage {
+				s.melody.messageSentHandler(s, msg.msg)
+			}
+
+			if msg.t == websocket.BinaryMessage {
+				s.melody.messageSentHandlerBinary(s, msg.msg)
+			}
+
 		case msg, ok := <-s.output:
 			if !ok {
 				break loop

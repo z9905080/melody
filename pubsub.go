@@ -26,10 +26,10 @@ type pubSub struct {
 }
 
 type cmd struct {
-	opCode operation        // 指令
-	topics []string         // 訂閱的主題
-	ch     chan interface{} // 使用的channel
-	msg    interface{}      // 訊息內文
+	opCode operation      // 指令
+	topics []string       // 訂閱的主題
+	ch     chan *envelope // 使用的channel
+	msg    *envelope      // 訊息內文
 }
 
 // pubSubNew 創建一個訂閱者模式(pattern)
@@ -40,33 +40,33 @@ func pubSubNew(bufferSize int) *pubSub {
 }
 
 // Sub 創建一個新的訂閱頻道, 並將channel回傳
-func (ps *pubSub) Sub(topics ...string) chan interface{} {
+func (ps *pubSub) Sub(topics ...string) chan *envelope {
 	return ps.sub(Subscribe, topics...)
 }
 
-func (ps *pubSub) sub(op operation, topics ...string) chan interface{} {
-	ch := make(chan interface{}, ps.bufferSize)
+func (ps *pubSub) sub(op operation, topics ...string) chan *envelope {
+	ch := make(chan *envelope, ps.bufferSize)
 	ps.commandChan <- cmd{opCode: op, topics: topics, ch: ch}
 	return ch
 }
 
 // AddSub 將要訂閱的Topic加到現有的channel
-func (ps *pubSub) AddSub(ch chan interface{}, topics ...string) {
+func (ps *pubSub) AddSub(ch chan *envelope, topics ...string) {
 	ps.commandChan <- cmd{opCode: Subscribe, topics: topics, ch: ch}
 }
 
 // Pub 發布訊息
-func (ps *pubSub) Pub(msg interface{}, topics ...string) {
+func (ps *pubSub) Pub(msg *envelope, topics ...string) {
 	ps.commandChan <- cmd{opCode: Publish, topics: topics, msg: msg}
 }
 
 // AsyncPub 非同步的發布訊息，內部機制（for select default）
-func (ps *pubSub) AsyncPub(msg interface{}, topics ...string) {
+func (ps *pubSub) AsyncPub(msg *envelope, topics ...string) {
 	ps.commandChan <- cmd{opCode: AsyncPublish, topics: topics, msg: msg}
 }
 
 // Unsub 取消訂閱
-func (ps *pubSub) Unsub(ch chan interface{}, topics ...string) {
+func (ps *pubSub) Unsub(ch chan *envelope, topics ...string) {
 	// 如果不寫topic，視為將全部topic都取消訂閱
 	if len(topics) == 0 {
 		ps.commandChan <- cmd{opCode: UnSubscribeAll, ch: ch}
@@ -90,8 +90,8 @@ func (ps *pubSub) start() {
 
 	// 初始化暫存在記憶體的資料(topicsMap & revertTopicsOfChannelMap)
 	reg := register{
-		topics:    make(map[string]map[chan interface{}]bool),
-		revTopics: make(map[chan interface{}]map[string]bool),
+		topics:    make(map[string]map[chan *envelope]bool),
+		revTopics: make(map[chan *envelope]map[string]bool),
 	}
 
 loop:
