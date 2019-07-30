@@ -2,8 +2,6 @@ package melody
 
 import (
 	"errors"
-	"io"
-	"log"
 	"net"
 	"net/http"
 	"sync"
@@ -144,7 +142,6 @@ loop:
 				s.melody.messageSentHandlerBinary(s, msg.msg)
 			}
 		case <-ticker.C:
-			log.Println("write Ping")
 			//wsutil.WriteServerMessage(s.conn, ws.OpPing, []byte(""))
 			s.ping()
 		}
@@ -153,7 +150,7 @@ loop:
 
 func (s *Session) readPump() {
 	//s.conn.SetReadLimit(s.melody.Config.MaxMessageSize)
-	//s.conn.SetDeadline(time.Time{})
+	s.conn.SetDeadline(time.Time{})
 	// s.conn.SetPongHandler(func(string) error {
 	// 	s.conn.SetReadDeadline(time.Now().Add(s.melody.Config.PongWait))
 	// 	s.melody.pongHandler(s)
@@ -166,29 +163,12 @@ func (s *Session) readPump() {
 	// 	})
 	// }
 
-	fn := func(h ws.Header, r io.Reader) error {
-		control := wsutil.ControlHandler{
-			DisableSrcCiphering: true,
-			Src:                 r,
-			Dst:                 s.conn,
-			State:               ws.StateServerSide,
-		}
-
-		control.SetHandlePongResponse(func() error {
-			s.conn.SetReadDeadline(time.Now().Add(s.melody.Config.PongWait))
-			return nil
-		})
-		return control.Handle(h)
-	}
-
 	for {
-		log.Println("wait Receive")
-		if msg, opCode, err := wsutil.ReadClientData(s.conn, fn); err != nil {
+		if msg, opCode, err := wsutil.ReadClientData(s.conn); err != nil {
 			break
 			s.conn.Close()
 		} else {
 			//t, message, err := s.conn.ReadMessage()
-			log.Println("Receive message")
 			if err != nil {
 				s.melody.errorHandler(s, err)
 				break
