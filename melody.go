@@ -3,8 +3,10 @@ package melody
 import (
 	"errors"
 	"net/http"
+	"runtime"
 	"sync"
 
+	"github.com/gobwas/ws"
 	"github.com/gorilla/websocket"
 )
 
@@ -56,7 +58,7 @@ type filterFunc func(*Session) bool
 // Melody implements a websocket manager.
 type Melody struct {
 	Config                   *Config
-	Upgrader                 *websocket.Upgrader
+	Upgrader                 *ws.Upgrader
 	messageHandler           handleMessageFunc
 	messageHandlerBinary     handleMessageFunc
 	messageSentHandler       handleMessageFunc
@@ -72,10 +74,16 @@ type Melody struct {
 
 // New creates a new melody instance with default Upgrader and Config.
 func New() *Melody {
-	upgrader := &websocket.Upgrader{
+	upgrader := &ws.Upgrader{
 		ReadBufferSize:  1024,
 		WriteBufferSize: 1024,
-		CheckOrigin:     func(r *http.Request) bool { return true },
+		OnBeforeUpgrade: func() (ws.HandshakeHeader, error) {
+			header := ws.HandshakeHeaderHTTP(http.Header{
+				"X-Go-Version": []string{runtime.Version()},
+			})
+			return header, nil
+		},
+		//CheckOrigin:     func(r *http.Request) bool { return true },
 	}
 
 	hub := newHub()
@@ -101,19 +109,19 @@ func New() *Melody {
 
 // PubMsg Publish Msg To Session Subscribe （向下相容）
 func (m *Melody) PubMsg(msg []byte, topics ...string) {
-	message := &envelope{t: websocket.TextMessage, msg: msg}
+	message := &envelope{opCode: ws.OpText, msg: msg}
 	m.pubsub.Pub(message, topics...)
 }
 
 // PubTextMsg Publish Msg To Session Subscribe
 func (m *Melody) PubTextMsg(msg []byte, topics ...string) {
-	message := &envelope{t: websocket.TextMessage, msg: msg}
+	message := &envelope{opCode: ws.OpText, msg: msg}
 	m.pubsub.Pub(message, topics...)
 }
 
 // PubBinaryMsg Publish Msg To Session Subscribe
 func (m *Melody) PubBinaryMsg(msg []byte, topics ...string) {
-	message := &envelope{t: websocket.BinaryMessage, msg: msg}
+	message := &envelope{opCode: ws.OpBinary, msg: msg}
 	m.pubsub.Pub(message, topics...)
 }
 
@@ -187,7 +195,8 @@ func (m *Melody) HandleRequestWithKeys(w http.ResponseWriter, r *http.Request, k
 		return errors.New("melody instance is closed")
 	}
 
-	conn, err := m.Upgrader.Upgrade(w, r, w.Header())
+	conn, _, _, err := ws.UpgradeHTTP(r, w)
+	//conn, err := m.Upgrader.Upgrade(w, r, w.Header())
 
 	if err != nil {
 		return err
@@ -210,7 +219,6 @@ func (m *Melody) HandleRequestWithKeys(w http.ResponseWriter, r *http.Request, k
 	m.connectHandler(session)
 
 	go session.writePump()
-
 	session.readPump()
 
 	if !m.hub.closed() {
@@ -218,9 +226,7 @@ func (m *Melody) HandleRequestWithKeys(w http.ResponseWriter, r *http.Request, k
 	}
 
 	session.close()
-
 	m.disconnectHandler(session)
-
 	return nil
 }
 
@@ -230,7 +236,7 @@ func (m *Melody) Broadcast(msg []byte) error {
 		return errors.New("melody instance is closed")
 	}
 
-	message := &envelope{t: websocket.TextMessage, msg: msg}
+	message := &envelope{opCode: ws.OpText, msg: msg}
 	m.hub.broadcast <- message
 
 	return nil
@@ -242,7 +248,7 @@ func (m *Melody) BroadcastFilter(msg []byte, fn func(*Session) bool) error {
 		return errors.New("melody instance is closed")
 	}
 
-	message := &envelope{t: websocket.TextMessage, msg: msg, filter: fn}
+	message := &envelope{opCode: ws.OpText, msg: msg, filter: fn}
 	m.hub.broadcast <- message
 
 	return nil
@@ -271,7 +277,7 @@ func (m *Melody) BroadcastBinary(msg []byte) error {
 		return errors.New("melody instance is closed")
 	}
 
-	message := &envelope{t: websocket.BinaryMessage, msg: msg}
+	message := &envelope{opCode: ws.OpBinary, msg: msg}
 	m.hub.broadcast <- message
 
 	return nil
@@ -283,7 +289,7 @@ func (m *Melody) BroadcastBinaryFilter(msg []byte, fn func(*Session) bool) error
 		return errors.New("melody instance is closed")
 	}
 
-	message := &envelope{t: websocket.BinaryMessage, msg: msg, filter: fn}
+	message := &envelope{opCode: ws.OpBinary, msg: msg, filter: fn}
 	m.hub.broadcast <- message
 
 	return nil
@@ -302,7 +308,7 @@ func (m *Melody) Close() error {
 		return errors.New("melody instance is already closed")
 	}
 
-	m.hub.exit <- &envelope{t: websocket.CloseMessage, msg: []byte{}}
+	m.hub.exit <- &envelope{opCode: ws.OpClose, msg: []byte{}}
 
 	return nil
 }
@@ -314,7 +320,7 @@ func (m *Melody) CloseWithMsg(msg []byte) error {
 		return errors.New("melody instance is already closed")
 	}
 
-	m.hub.exit <- &envelope{t: websocket.CloseMessage, msg: msg}
+	m.hub.exit <- &envelope{opCode: ws.OpClose, msg: msg}
 
 	return nil
 }

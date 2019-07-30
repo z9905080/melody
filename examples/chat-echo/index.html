@@ -37,10 +37,15 @@
         var line =  now() + " " + msg.data + "\n";
         chat.innerText += line;
       };
+      ws.onclose = function () {
+        var line =  now() + " 你已經斷線了！\n";
+        chat.innerText += line;
+      }
 
       text.onkeydown = function (e) {
         if (e.keyCode === 13 && text.value !== "") {
-          ws.send("<" + name + "> " + text.value);
+          ws.ping()
+          ws.send(text.value);
           text.value = "";
         }
       };

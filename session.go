@@ -2,11 +2,15 @@ package melody
 
 import (
 	"errors"
+	"io"
+	"log"
+	"net"
 	"net/http"
 	"sync"
 	"time"
 
-	"github.com/gorilla/websocket"
+	"github.com/gobwas/ws"
+	"github.com/gobwas/ws/wsutil"
 )
 
 // Session wrapper around websocket connections.
@@ -14,7 +18,7 @@ type Session struct {
 	Request  *http.Request
 	Keys     map[string]interface{}
 	keymutex *sync.RWMutex
-	conn     *websocket.Conn
+	conn     net.Conn
 	output   chan *envelope
 	melody   *Melody
 	open     bool
@@ -55,7 +59,8 @@ func (s *Session) writeRaw(message *envelope) error {
 	}
 
 	s.conn.SetWriteDeadline(time.Now().Add(s.melody.Config.WriteWait))
-	err := s.conn.WriteMessage(message.t, message.msg)
+	err := wsutil.WriteServerMessage(s.conn, message.opCode, message.msg)
+	//s.conn.WriteMessage(message.t, message.msg)
 
 	if err != nil {
 		return err
@@ -83,7 +88,7 @@ func (s *Session) close() {
 }
 
 func (s *Session) ping() {
-	s.writeRaw(&envelope{t: websocket.PingMessage, msg: []byte{}})
+	s.writeRaw(&envelope{opCode: ws.OpPing, msg: []byte{}})
 }
 
 func (s *Session) writePump() {
@@ -103,15 +108,15 @@ loop:
 				break loop
 			}
 
-			if msg.t == websocket.CloseMessage {
+			if msg.opCode == ws.OpClose {
 				break loop
 			}
 
-			if msg.t == websocket.TextMessage {
+			if msg.opCode == ws.OpText {
 				s.melody.messageSentHandler(s, msg.msg)
 			}
 
-			if msg.t == websocket.BinaryMessage {
+			if msg.opCode == ws.OpText {
 				s.melody.messageSentHandlerBinary(s, msg.msg)
 			}
 
@@ -127,53 +132,75 @@ loop:
 				break loop
 			}
 
-			if msg.t == websocket.CloseMessage {
+			if msg.opCode == ws.OpClose {
 				break loop
 			}
 
-			if msg.t == websocket.TextMessage {
+			if msg.opCode == ws.OpText {
 				s.melody.messageSentHandler(s, msg.msg)
 			}
 
-			if msg.t == websocket.BinaryMessage {
+			if msg.opCode == ws.OpText {
 				s.melody.messageSentHandlerBinary(s, msg.msg)
 			}
 		case <-ticker.C:
+			log.Println("write Ping")
+			//wsutil.WriteServerMessage(s.conn, ws.OpPing, []byte(""))
 			s.ping()
 		}
 	}
 }
 
 func (s *Session) readPump() {
-	s.conn.SetReadLimit(s.melody.Config.MaxMessageSize)
-	s.conn.SetReadDeadline(time.Now().Add(s.melody.Config.PongWait))
+	//s.conn.SetReadLimit(s.melody.Config.MaxMessageSize)
+	//s.conn.SetDeadline(time.Time{})
+	// s.conn.SetPongHandler(func(string) error {
+	// 	s.conn.SetReadDeadline(time.Now().Add(s.melody.Config.PongWait))
+	// 	s.melody.pongHandler(s)
+	// 	return nil
+	// })
 
-	s.conn.SetPongHandler(func(string) error {
-		s.conn.SetReadDeadline(time.Now().Add(s.melody.Config.PongWait))
-		s.melody.pongHandler(s)
-		return nil
-	})
+	// if s.melody.closeHandler != nil {
+	// 	s.conn.SetCloseHandler(func(code int, text string) error {
+	// 		return s.melody.closeHandler(s, code, text)
+	// 	})
+	// }
 
-	if s.melody.closeHandler != nil {
-		s.conn.SetCloseHandler(func(code int, text string) error {
-			return s.melody.closeHandler(s, code, text)
+	fn := func(h ws.Header, r io.Reader) error {
+		control := wsutil.ControlHandler{
+			DisableSrcCiphering: true,
+			Src:                 r,
+			Dst:                 s.conn,
+			State:               ws.StateServerSide,
+		}
+
+		control.SetHandlePongResponse(func() error {
+			s.conn.SetReadDeadline(time.Now().Add(s.melody.Config.PongWait))
+			return nil
 		})
+		return control.Handle(h)
 	}
 
 	for {
-		t, message, err := s.conn.ReadMessage()
-
-		if err != nil {
-			s.melody.errorHandler(s, err)
+		log.Println("wait Receive")
+		if msg, opCode, err := wsutil.ReadClientData(s.conn, fn); err != nil {
 			break
-		}
+			s.conn.Close()
+		} else {
+			//t, message, err := s.conn.ReadMessage()
+			log.Println("Receive message")
+			if err != nil {
+				s.melody.errorHandler(s, err)
+				break
+			}
 
-		if t == websocket.TextMessage {
-			s.melody.messageHandler(s, message)
-		}
+			if opCode == ws.OpText {
+				s.melody.messageHandler(s, msg)
+			}
 
-		if t == websocket.BinaryMessage {
-			s.melody.messageHandlerBinary(s, message)
+			if opCode == ws.OpBinary {
+				s.melody.messageHandlerBinary(s, msg)
+			}
 		}
 	}
 }
@@ -184,7 +211,7 @@ func (s *Session) Write(msg []byte) error {
 		return errors.New("session is closed")
 	}
 
-	s.writeMessage(&envelope{t: websocket.TextMessage, msg: msg})
+	s.writeMessage(&envelope{opCode: ws.OpText, msg: msg})
 
 	return nil
 }
@@ -195,7 +222,7 @@ func (s *Session) WriteBinary(msg []byte) error {
 		return errors.New("session is closed")
 	}
 
-	s.writeMessage(&envelope{t: websocket.BinaryMessage, msg: msg})
+	s.writeMessage(&envelope{opCode: ws.OpBinary, msg: msg})
 
 	return nil
 }
@@ -206,7 +233,7 @@ func (s *Session) Close() error {
 		return errors.New("session is already closed")
 	}
 
-	s.writeMessage(&envelope{t: websocket.CloseMessage, msg: []byte{}})
+	s.writeMessage(&envelope{opCode: ws.OpClose, msg: []byte{}})
 
 	return nil
 }
@@ -218,7 +245,7 @@ func (s *Session) CloseWithMsg(msg []byte) error {
 		return errors.New("session is already closed")
 	}
 
-	s.writeMessage(&envelope{t: websocket.CloseMessage, msg: msg})
+	s.writeMessage(&envelope{opCode: ws.OpClose, msg: msg})
 
 	return nil
 }
