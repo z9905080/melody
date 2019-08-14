@@ -36,6 +36,19 @@ func (s *Session) AddSub(topicNames ...string) {
 	}
 }
 
+func (s *Session) UnSub(topicNames ...string) {
+	if s.subChan != nil {
+		s.melody.pubsub.Unsub(s.subChan, topicNames...)
+	} else {
+		var str = ""
+		for _, topicName := range topicNames {
+			str += topicName + ","
+		}
+		str = str[0 : len(str)-1]
+		s.melody.errorHandler(s, errors.New("error of unsub current channel,"+str))
+	}
+}
+
 func (s *Session) writeMessage(message *envelope) {
 	if s.closed() {
 		s.melody.errorHandler(s, errors.New("tried to write to closed a session"))
