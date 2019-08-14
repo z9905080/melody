@@ -100,21 +100,33 @@ func New() *Melody {
 }
 
 // PubMsg Publish Msg To Session Subscribe （向下相容）
-func (m *Melody) PubMsg(msg []byte, topics ...string) {
+func (m *Melody) PubMsg(msg []byte, isAsync bool, topics ...string) {
 	message := &envelope{t: websocket.TextMessage, msg: msg}
-	m.pubsub.Pub(message, topics...)
+	if isAsync {
+		m.pubsub.AsyncPub(message, topics...)
+	} else {
+		m.pubsub.Pub(message, topics...)
+	}
 }
 
 // PubTextMsg Publish Msg To Session Subscribe
-func (m *Melody) PubTextMsg(msg []byte, topics ...string) {
+func (m *Melody) PubTextMsg(msg []byte, isAsync bool, topics ...string) {
 	message := &envelope{t: websocket.TextMessage, msg: msg}
-	m.pubsub.Pub(message, topics...)
+	if isAsync {
+		m.pubsub.AsyncPub(message, topics...)
+	} else {
+		m.pubsub.Pub(message, topics...)
+	}
 }
 
 // PubBinaryMsg Publish Msg To Session Subscribe
-func (m *Melody) PubBinaryMsg(msg []byte, topics ...string) {
+func (m *Melody) PubBinaryMsg(msg []byte, isAsync bool, topics ...string) {
 	message := &envelope{t: websocket.BinaryMessage, msg: msg}
-	m.pubsub.Pub(message, topics...)
+	if isAsync {
+		m.pubsub.AsyncPub(message, topics...)
+	} else {
+		m.pubsub.Pub(message, topics...)
+	}
 }
 
 // HandleConnect fires fn when a session connects.
