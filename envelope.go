@@ -5,3 +5,10 @@ type envelope struct {
 	msg    []byte
 	filter filterFunc
 }
+
+type closesession struct {
+	t           int
+	key         string
+	value       interface{}
+	keepSession *Session
+}

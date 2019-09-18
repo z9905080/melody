@@ -1,28 +1,31 @@
 package melody
 
 import (
+	"reflect"
 	"sync"
 )
 
 type hub struct {
-	sessions   map[*Session]bool
-	broadcast  chan *envelope
-	register   chan *Session
-	unregister chan *Session
-	exit       chan *envelope
-	open       bool
-	rwmutex    *sync.RWMutex
+	sessions     map[*Session]bool
+	broadcast    chan *envelope
+	closesession chan *closesession
+	register     chan *Session
+	unregister   chan *Session
+	exit         chan *envelope
+	open         bool
+	rwmutex      *sync.RWMutex
 }
 
 func newHub() *hub {
 	return &hub{
-		sessions:   make(map[*Session]bool),
-		broadcast:  make(chan *envelope),
-		register:   make(chan *Session),
-		unregister: make(chan *Session),
-		exit:       make(chan *envelope),
-		open:       true,
-		rwmutex:    &sync.RWMutex{},
+		sessions:     make(map[*Session]bool),
+		broadcast:    make(chan *envelope),
+		closesession: make(chan *closesession),
+		register:     make(chan *Session),
+		unregister:   make(chan *Session),
+		exit:         make(chan *envelope),
+		open:         true,
+		rwmutex:      &sync.RWMutex{},
 	}
 }
 
@@ -40,6 +43,20 @@ loop:
 				delete(h.sessions, s)
 				h.rwmutex.Unlock()
 			}
+		case cs := <-h.closesession:
+			h.rwmutex.Lock()
+			for s := range h.sessions {
+				if cs.keepSession != nil && reflect.DeepEqual(s, cs.keepSession) {
+					continue
+				}
+				if data, isExist := s.Keys[cs.key]; isExist {
+					if reflect.DeepEqual(data, cs.value) {
+						s.Close()
+						break
+					}
+				}
+			}
+			h.rwmutex.Unlock()
 		case m := <-h.broadcast:
 			h.rwmutex.RLock()
 			for s := range h.sessions {

@@ -99,6 +99,12 @@ func New() *Melody {
 	}
 }
 
+// CloseSessions 關閉Session，指定Key(Value相等的)
+func (m *Melody) CloseSessions(key string, value interface{}, keepSession *Session) {
+	message := &closesession{t: websocket.CloseMessage, key: key, value: value, keepSession: keepSession}
+	m.hub.closesession <- message
+}
+
 // PubMsg Publish Msg To Session Subscribe （向下相容）
 func (m *Melody) PubMsg(msg []byte, isAsync bool, topics ...string) {
 	message := &envelope{t: websocket.TextMessage, msg: msg}
