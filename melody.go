@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"sync"
 
+	uuid "github.com/satori/go.uuid"
+
 	"github.com/gorilla/websocket"
 )
 
@@ -100,8 +102,8 @@ func New() *Melody {
 }
 
 // CloseSessions 關閉Session，指定Key(Value相等的)
-func (m *Melody) CloseSessions(key string, value interface{}, keepSession *Session) {
-	message := &closesession{t: websocket.CloseMessage, key: key, value: value, keepSession: keepSession}
+func (m *Melody) CloseSessions(key string, value interface{}, keepSessionHash string) {
+	message := &closesession{t: websocket.CloseMessage, key: key, value: value, keepSessionHash: keepSessionHash}
 	m.hub.closesession <- message
 }
 
@@ -220,6 +222,7 @@ func (m *Melody) HandleRequestWithKeys(w http.ResponseWriter, r *http.Request, k
 		open:     true,
 		rwmutex:  &sync.RWMutex{},
 		keymutex: &sync.RWMutex{},
+		hashID:   uuid.Must(uuid.NewV4()).String(),
 		subChan:  m.pubsub.Sub("default"),
 	}
 

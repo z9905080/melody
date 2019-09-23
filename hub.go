@@ -46,7 +46,7 @@ loop:
 		case cs := <-h.closesession:
 			h.rwmutex.Lock()
 			for s := range h.sessions {
-				if cs.keepSession != nil && reflect.DeepEqual(s, cs.keepSession) {
+				if reflect.DeepEqual(s.hashID, cs.keepSessionHash) {
 					continue
 				}
 				if data, isExist := s.Keys[cs.key]; isExist {

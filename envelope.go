@@ -7,8 +7,8 @@ type envelope struct {
 }
 
 type closesession struct {
-	t           int
-	key         string
-	value       interface{}
-	keepSession *Session
+	t               int
+	key             string
+	value           interface{}
+	keepSessionHash string
 }

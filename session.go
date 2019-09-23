@@ -18,8 +18,14 @@ type Session struct {
 	output   chan *envelope
 	melody   *Melody
 	open     bool
+	hashID   string
 	rwmutex  *sync.RWMutex
 	subChan  chan *envelope
+}
+
+// GetHashID 取得 HashID
+func (s *Session) GetHashID() string {
+	return s.hashID
 }
 
 // AddSub 訂閱某個,多個topic
