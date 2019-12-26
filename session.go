@@ -56,6 +56,13 @@ func (s *Session) UnSub(topicNames ...string) {
 }
 
 func (s *Session) writeMessage(message *envelope) {
+
+	defer func() {
+        if recover() != nil {
+			s.melody.errorHandler(s, errors.New("tried to write to closed a session"))
+        }
+    }()
+
 	if s.closed() {
 		s.melody.errorHandler(s, errors.New("tried to write to closed a session"))
 		return
