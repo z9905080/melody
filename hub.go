@@ -49,7 +49,8 @@ loop:
 				if cs.keepSessionHash != "" && reflect.DeepEqual(s.hashID, cs.keepSessionHash) {
 					continue
 				}
-				if data, isExist := s.Keys[cs.key]; isExist {
+
+				if data, isExist := s.Get(cs.key); isExist {
 					if reflect.DeepEqual(data, cs.value) {
 						s.Close()
 						break
