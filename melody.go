@@ -2,10 +2,9 @@ package melody
 
 import (
 	"errors"
+	uuid "github.com/satori/go.uuid"
 	"net/http"
 	"sync"
-
-	uuid "github.com/satori/go.uuid"
 
 	"github.com/gorilla/websocket"
 )
@@ -72,11 +71,55 @@ type Melody struct {
 	pubsub                   *pubSub
 }
 
+// DialOption specifies an option for dialing a Melody server.
+type DialOption struct {
+	f func(*dialOptions)
+}
+
+type dialOptions struct {
+	channelBufferSize int // 訂閱的通道大小
+	readBufferSize    int // 讀取的buffer大小
+	writeBufferSize   int // 寫入的buffer大小
+}
+
+// DialChannelBufferSize 設置ChannelBufferSize
+func DialChannelBufferSize(size int) DialOption {
+	return DialOption{func(do *dialOptions) {
+		do.channelBufferSize = size
+	}}
+}
+
+// DialWriteBufferSize 設置WriteBufferSize
+func DialWriteBufferSize(size int) DialOption {
+	return DialOption{func(do *dialOptions) {
+		do.writeBufferSize = size
+	}}
+}
+
+// DialReadBufferSize 設置DialReadBufferSize
+func DialReadBufferSize(size int) DialOption {
+	return DialOption{func(do *dialOptions) {
+		do.readBufferSize = size
+	}}
+}
+
 // New creates a new melody instance with default Upgrader and Config.
-func New() *Melody {
+func New(options ...DialOption) *Melody {
+
+	// default
+	melodySetting := dialOptions{
+		channelBufferSize: 100,
+		writeBufferSize:   1024,
+		readBufferSize:    1024,
+	}
+
+	for _, option := range options {
+		option.f(&melodySetting)
+	}
+
 	upgrader := &websocket.Upgrader{
-		ReadBufferSize:  1024,
-		WriteBufferSize: 1024,
+		ReadBufferSize:  melodySetting.readBufferSize,
+		WriteBufferSize: melodySetting.writeBufferSize,
 		CheckOrigin:     func(r *http.Request) bool { return true },
 	}
 
@@ -97,7 +140,7 @@ func New() *Melody {
 		disconnectHandler:        func(*Session) {},
 		pongHandler:              func(*Session) {},
 		hub:                      hub,
-		pubsub:                   pubSubNew(100),
+		pubsub:                   pubSubNew(melodySetting.channelBufferSize),
 	}
 }
 
