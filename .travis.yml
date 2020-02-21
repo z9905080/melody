@@ -9,6 +9,7 @@ go:
 - 1.12
 - 1.13
 install:
+  - go get github.com/satori/go.uuid
   - go get github.com/gorilla/websocket
 script:
   - go test
