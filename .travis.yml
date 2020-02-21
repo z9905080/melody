@@ -10,7 +10,8 @@ install:
   - go get github.com/satori/go.uuid
   - go get github.com/gorilla/websocket
 script:
-  - go test -race -coverprofile=coverage.txt -covermode=atomic
+  - go test
   - go build
 after_success:
-  - bash <(curl -s https://codecov.io/bash)
+　- go test -race -coverprofile=coverage.txt -covermode=atomic
+　- bash <(curl -s https://codecov.io/bash)
