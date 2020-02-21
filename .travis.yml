@@ -1,5 +1,4 @@
 language: go
-sudo: required
 go:
 - 1.8
 - 1.10
@@ -11,6 +10,5 @@ install:
 script:
   - go test
   - go build
-
 after_success:
-  - bash <(curl -s https://codecov.io/bash) -t 7330c10c-6b17-4902-9f64-0c8ad7e0f259
+  - bash <(curl -s https://codecov.io/bash)
