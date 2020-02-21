@@ -77,26 +77,26 @@ type DialOption struct {
 }
 
 type dialOptions struct {
-	channelBufferSize int // 訂閱的通道大小
-	readBufferSize    int // 讀取的buffer大小
-	writeBufferSize   int // 寫入的buffer大小
+	channelBufferSize int // subscribe buffer channel size
+	readBufferSize    int // connection read buffer size
+	writeBufferSize   int // connection write buffer size
 }
 
-// DialChannelBufferSize 設置ChannelBufferSize
+// DialChannelBufferSize set ChannelBufferSize
 func DialChannelBufferSize(size int) DialOption {
 	return DialOption{func(do *dialOptions) {
 		do.channelBufferSize = size
 	}}
 }
 
-// DialWriteBufferSize 設置WriteBufferSize
+// DialWriteBufferSize set WriteBufferSize
 func DialWriteBufferSize(size int) DialOption {
 	return DialOption{func(do *dialOptions) {
 		do.writeBufferSize = size
 	}}
 }
 
-// DialReadBufferSize 設置DialReadBufferSize
+// DialReadBufferSize set DialReadBufferSize
 func DialReadBufferSize(size int) DialOption {
 	return DialOption{func(do *dialOptions) {
 		do.readBufferSize = size
@@ -144,13 +144,14 @@ func New(options ...DialOption) *Melody {
 	}
 }
 
-// CloseSessions 關閉Session，指定Key(Value相等的)
+// CloseSessions 關閉Session，指定Key(Value相等的) Close Session if Key,Value Match
+// example: in multi server:  same user login, close session by user and keep current connection by hashID
 func (m *Melody) CloseSessions(key string, value interface{}, keepSessionHash string) {
 	message := &closesession{t: websocket.CloseMessage, key: key, value: value, keepSessionHash: keepSessionHash}
 	m.hub.closesession <- message
 }
 
-// PubMsg Publish Msg To Session Subscribe （向下相容）
+// PubMsg Publish Message To Session Subscribe （向下相容）
 func (m *Melody) PubMsg(msg []byte, isAsync bool, topics ...string) {
 	message := &envelope{t: websocket.TextMessage, msg: msg}
 	if isAsync {
@@ -160,7 +161,7 @@ func (m *Melody) PubMsg(msg []byte, isAsync bool, topics ...string) {
 	}
 }
 
-// PubTextMsg Publish Msg To Session Subscribe
+// PubTextMsg Publish Message To Session Subscribe
 func (m *Melody) PubTextMsg(msg []byte, isAsync bool, topics ...string) {
 	message := &envelope{t: websocket.TextMessage, msg: msg}
 	if isAsync {
@@ -170,7 +171,7 @@ func (m *Melody) PubTextMsg(msg []byte, isAsync bool, topics ...string) {
 	}
 }
 
-// PubBinaryMsg Publish Msg To Session Subscribe
+// PubBinaryMsg Publish Message To Session Subscribe
 func (m *Melody) PubBinaryMsg(msg []byte, isAsync bool, topics ...string) {
 	message := &envelope{t: websocket.BinaryMessage, msg: msg}
 	if isAsync {
