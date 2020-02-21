@@ -4,11 +4,16 @@ go:
 - 1.10
 - 1.12
 - 1.13
+- tip
+
+before_install:
+  - go get -t -v ./...
+
 install:
   - go get github.com/satori/go.uuid
   - go get github.com/gorilla/websocket
 script:
-  - go test
+  - go test -race -coverprofile=coverage.txt -covermode=atomic
   - go build
 after_success:
   - bash <(curl -s https://codecov.io/bash)
