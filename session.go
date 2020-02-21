@@ -23,12 +23,12 @@ type Session struct {
 	subChan  chan *envelope
 }
 
-// GetHashID 取得 HashID
+// GetHashID 取得 HashID (Get Session HashID)
 func (s *Session) GetHashID() string {
 	return s.hashID
 }
 
-// AddSub 訂閱某個,多個topic
+// AddSub 訂閱某個,多個topic (Session subscribe one or multi topics)
 func (s *Session) AddSub(topicNames ...string) {
 	if s.subChan != nil {
 		s.melody.pubsub.AddSub(s.subChan, topicNames...)
@@ -42,6 +42,7 @@ func (s *Session) AddSub(topicNames ...string) {
 	}
 }
 
+// UnSub (Session unsubscribe one or multi topics, if no topics ,will unsubscribe all topics)
 func (s *Session) UnSub(topicNames ...string) {
 	if s.subChan != nil {
 		s.melody.pubsub.Unsub(s.subChan, topicNames...)
@@ -58,10 +59,10 @@ func (s *Session) UnSub(topicNames ...string) {
 func (s *Session) writeMessage(message *envelope) {
 
 	defer func() {
-        if recover() != nil {
+		if recover() != nil {
 			s.melody.errorHandler(s, errors.New("tried to write to closed a session"))
-        }
-    }()
+		}
+	}()
 
 	if s.closed() {
 		s.melody.errorHandler(s, errors.New("tried to write to closed a session"))
