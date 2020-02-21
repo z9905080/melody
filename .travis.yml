@@ -13,4 +13,4 @@ script:
   - go build
 
 after_success:
-  - bash <(curl -s https://codecov.io/bash)
+  - bash <(curl -s https://codecov.io/bash) -t 7330c10c-6b17-4902-9f64-0c8ad7e0f259
