@@ -2,9 +2,10 @@ package melody
 
 import (
 	"errors"
-	uuid "github.com/satori/go.uuid"
 	"net/http"
 	"sync"
+
+	uuid "github.com/satori/go.uuid"
 
 	"github.com/gorilla/websocket"
 )
