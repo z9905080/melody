@@ -1,4 +1,4 @@
-module melody
+module github.com/z9905080/melody
 
 go 1.13
 
