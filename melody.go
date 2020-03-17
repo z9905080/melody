@@ -266,7 +266,7 @@ func (m *Melody) HandleRequestWithKeys(w http.ResponseWriter, r *http.Request, k
 		open:     true,
 		rwmutex:  &sync.RWMutex{},
 		keymutex: &sync.RWMutex{},
-		hashID:   uuid.Must(uuid.NewV4()).String(),
+		hashID:   uuid.NewV4().String(),
 		subChan:  m.pubsub.Sub("default"),
 	}
 
