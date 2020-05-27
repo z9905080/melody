@@ -78,6 +78,12 @@ func main() {
 ## Contributors
 
 * Shouting (@z9905080)
+* Ola Holmström (@olahol)
+* Shogo Iwano (@shiwano)
+* Matt Caldwell (@mattcaldwell)
+* Heikki Uljas (@huljas)
+* Robbie Trencheny (@robbiet480)
+* yangjinecho (@yangjinecho)
 
 ## FAQ
 
