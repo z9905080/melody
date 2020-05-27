@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <title>WebSocket</title>
+</head>
+
+<body>
+<p id="output"></p>
+<form>
+    Message: <input type="text" id="Message">
+</form>
+<input type="button" value="Send" onclick="SendWS()">
+
+
+<script>
+    var loc = window.location;
+    var uri = 'ws:';
+
+    if (loc.protocol === 'https:') {
+        uri = 'wss:';
+    }
+    uri += '//' + loc.host;
+    uri += '/ws';
+    console.log(uri)
+    ws = new WebSocket(uri)
+
+    ws.onopen = function () {
+        console.log('Connected')
+    }
+
+    ws.onmessage = function (evt) {
+        var out = document.getElementById('output');
+        out.innerHTML += evt.data + '<br>';
+    }
+
+    function SendWS() {
+        var message = document.getElementById("Message").value;
+        ws.send(message);
+    }
+
+
+</script>
+</body>
+
+</html>
