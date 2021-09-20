@@ -78,9 +78,10 @@ type DialOption struct {
 }
 
 type dialOptions struct {
-	channelBufferSize int // subscribe buffer channel size
-	readBufferSize    int // connection read buffer size
-	writeBufferSize   int // connection write buffer size
+	channelBufferSize int  // subscribe buffer channel size
+	readBufferSize    int  // connection read buffer size
+	writeBufferSize   int  // connection write buffer size
+	enableCompression bool // enable websocket RFC7692 compress
 }
 
 // DialChannelBufferSize set ChannelBufferSize
@@ -104,6 +105,13 @@ func DialReadBufferSize(size int) DialOption {
 	}}
 }
 
+// DialReadBufferSize set DialReadBufferSize
+func DialEnableCompress(isEnable bool) DialOption {
+	return DialOption{func(do *dialOptions) {
+		do.enableCompression = isEnable
+	}}
+}
+
 // New creates a new melody instance with default Upgrader and Config.
 func New(options ...DialOption) *Melody {
 
@@ -112,6 +120,7 @@ func New(options ...DialOption) *Melody {
 		channelBufferSize: 100,
 		writeBufferSize:   1024,
 		readBufferSize:    1024,
+		enableCompression: false,
 	}
 
 	for _, option := range options {
@@ -119,9 +128,10 @@ func New(options ...DialOption) *Melody {
 	}
 
 	upgrader := &websocket.Upgrader{
-		ReadBufferSize:  melodySetting.readBufferSize,
-		WriteBufferSize: melodySetting.writeBufferSize,
-		CheckOrigin:     func(r *http.Request) bool { return true },
+		ReadBufferSize:    melodySetting.readBufferSize,
+		WriteBufferSize:   melodySetting.writeBufferSize,
+		CheckOrigin:       func(r *http.Request) bool { return true },
+		EnableCompression: melodySetting.enableCompression,
 	}
 
 	hub := newHub()
