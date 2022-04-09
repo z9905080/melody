@@ -11,16 +11,17 @@ import (
 
 // Session wrapper around websocket connections.
 type Session struct {
-	Request  *http.Request
-	Keys     map[string]interface{}
-	keymutex *sync.RWMutex
-	conn     *websocket.Conn
-	output   chan *envelope
-	melody   *Melody
-	open     bool
-	hashID   string
-	rwmutex  *sync.RWMutex
-	subChan  chan *envelope
+	Request         *http.Request
+	Keys            map[string]interface{}
+	keymutex        *sync.RWMutex
+	conn            *websocket.Conn
+	output          chan *envelope
+	closeOutputChan chan struct{}
+	melody          *Melody
+	open            bool
+	hashID          string
+	rwmutex         *sync.RWMutex
+	subChan         chan *envelope
 }
 
 // GetHashID 取得 HashID (Get Session HashID)
@@ -60,7 +61,7 @@ func (s *Session) writeMessage(message *envelope) {
 
 	defer func() {
 		if recover() != nil {
-			s.melody.errorHandler(s, errors.New("tried to write to closed a session"))
+			s.melody.errorHandler(s, errors.New("tried to write to closed a session for recover"))
 		}
 	}()
 
@@ -101,10 +102,13 @@ func (s *Session) closed() bool {
 func (s *Session) close() {
 	if !s.closed() {
 		s.rwmutex.Lock()
+		if s.open {
+			s.conn.Close()
+			close(s.closeOutputChan)
+			close(s.output)
+			s.melody.pubsub.Unsub(s.subChan)
+		}
 		s.open = false
-		s.conn.Close()
-		close(s.output)
-		s.melody.pubsub.Unsub(s.subChan)
 		s.rwmutex.Unlock()
 	}
 }
@@ -120,6 +124,10 @@ func (s *Session) writePump() {
 loop:
 	for {
 		select {
+		case _, ok := <-s.closeOutputChan:
+			if !ok {
+				break loop
+			}
 		case msg, ok := <-s.subChan:
 			if !ok {
 				break loop
