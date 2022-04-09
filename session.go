@@ -2,7 +2,6 @@ package melody
 
 import (
 	"errors"
-	"log"
 	"net/http"
 	"sync"
 	"time"
@@ -179,7 +178,6 @@ loop:
 		}
 	}
 
-	log.Println("break loop")
 }
 
 func (s *Session) readPump() {
