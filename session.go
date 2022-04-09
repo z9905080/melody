@@ -2,6 +2,7 @@ package melody
 
 import (
 	"errors"
+	"log"
 	"net/http"
 	"sync"
 	"time"
@@ -61,19 +62,19 @@ func (s *Session) writeMessage(message *envelope) {
 
 	defer func() {
 		if recover() != nil {
-			s.melody.errorHandler(s, errors.New("tried to write to closed a session for recover"))
+			s.melody.errorHandler(s, ErrWriteToCloseSessionForRecover)
 		}
 	}()
 
 	if s.closed() {
-		s.melody.errorHandler(s, errors.New("tried to write to closed a session"))
+		s.melody.errorHandler(s, ErrWriteToCloseSession)
 		return
 	}
 
 	select {
 	case s.output <- message:
 	default:
-		s.melody.errorHandler(s, errors.New("session message buffer is full"))
+		s.melody.errorHandler(s, ErrSessionMessageBufferIsFull)
 	}
 }
 
@@ -177,6 +178,8 @@ loop:
 			s.ping()
 		}
 	}
+
+	log.Println("break loop")
 }
 
 func (s *Session) readPump() {
