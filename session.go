@@ -105,7 +105,6 @@ func (s *Session) close() {
 		if s.open {
 			s.conn.Close()
 			close(s.closeOutputChan)
-			close(s.output)
 			s.melody.pubsub.Unsub(s.subChan)
 		}
 		s.open = false
@@ -126,6 +125,7 @@ loop:
 		select {
 		case _, ok := <-s.closeOutputChan:
 			if !ok {
+				close(s.output)
 				break loop
 			}
 		case msg, ok := <-s.subChan:
